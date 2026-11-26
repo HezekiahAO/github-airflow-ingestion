@@ -10,7 +10,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 
-class GitHubRepo(BaseModel):
+class GitHubRepo(BaseModel):                    # Using Pydantic to read the type hints and converts or check values automatically.
     model_config = ConfigDict(extra="ignore", frozen=True)
 
     repo_id: int = Field(gt=0, validation_alias="id")
@@ -19,7 +19,7 @@ class GitHubRepo(BaseModel):
     full_name: str = Field(min_length=3)
     html_url: str
     description: str | None = None
-    language: str | None = None
+    language: str | None = None             # i used none here because not all valid repos have license, language and descriptions
     license: str | None = None
     default_branch: str = Field(min_length=1)
     visibility: str = "public"
