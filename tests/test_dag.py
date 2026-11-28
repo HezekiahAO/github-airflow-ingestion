@@ -44,7 +44,8 @@ def test_live_dependencies(live, upstream, downstream):
     assert downstream in live.get_task(upstream).downstream_task_ids
 
 
-@pytest.mark.parametrize("upstream, downstream", COMMON_EDGES)
+@pytest.mark.parametrize("upstream, downstream", COMMON_EDGES + [
+    ("plan_extraction", "wait_for_snapshot"), ("wait_for_snapshot", "extract_repositories")])
 def test_fixture_dependencies(fixture_dag, upstream, downstream):
     assert downstream in fixture_dag.get_task(upstream).downstream_task_ids
 
@@ -68,3 +69,23 @@ def test_schedule(live, fixture_dag):
     assert live.catchup is False
     assert fixture_dag.catchup is True
     assert (fixture_dag.end_date - fixture_dag.start_date).days + 1 == 7
+
+
+def test_retries_and_timeouts(live, fixture_dag):
+    for d in (live, fixture_dag):
+        for t in d.tasks:
+            assert t.execution_timeout is not None, t.task_id
+        extract = d.get_task("extract_repositories")
+        assert extract.retries == 3 and extract.retry_exponential_backoff
+        assert d.dagrun_timeout is not None
+
+
+@pytest.mark.parametrize("dag_name, sensor_id", [("live", "check_api_quota"), ("fixture_dag", "wait_for_snapshot")])
+def test_readiness_sensor_reschedules(request, dag_name, sensor_id):
+    sensor = request.getfixturevalue(dag_name).get_task(sensor_id)
+    assert sensor.mode == "reschedule" and sensor.timeout > 0
+
+
+def test_failure_simulation_param(live, fixture_dag):
+    for d in (live, fixture_dag):
+        assert d.params["simulate_failure"] == "none"

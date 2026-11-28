@@ -4,7 +4,7 @@ Two DAGs share the same tasks and code path:
   github_ingestion          live GitHub API, schema `public`
   github_ingestion_fixture  replayed daily snapshots, schema `fixture` (reproducible backfills)
 
-start_run -> plan_extraction -> [check_api_quota] -> extract_repositories[org]
+start_run -> plan_extraction -> check_api_quota | wait_for_snapshot (sensor) -> extract_repositories[org]
           -> validate_repositories[org] -> load_and_quarantine -> finalize_run
 
 Big data (API responses, validated records) is written to files on the shared
@@ -14,22 +14,29 @@ Scheduling: daily at 00:00 UTC with CronDataIntervalTimetable, so each run cover
 the interval [data_interval_start, data_interval_end) and starts after it ends.
 The live API only knows *current* state, so the live DAG does not catch up;
 historical intervals are replayed with the fixture DAG instead.
+
+Reliability: every task retries with exponential backoff and has an execution
+timeout; the sensors wait (in reschedule mode, freeing the worker slot) for API
+quota / snapshot files; finalize_run uses trigger_rule="all_done" so a failed
+run is always recorded as failed. Param `simulate_failure` demonstrates a
+transient failure that recovers on retry, or a permanent one that ends the run.
 """
 import logging
 import os
 from contextlib import closing
+from datetime import timedelta
 
 import pendulum
 import psycopg2
-from airflow.sdk import BaseHook, Param, dag, get_current_context, task
-from airflow.sdk.exceptions import AirflowFailException
+from airflow.sdk import BaseHook, Param, PokeReturnValue, dag, get_current_context, task
+from airflow.sdk.exceptions import AirflowException, AirflowFailException
 from airflow.sdk.execution_time.task_runner import RuntimeTaskInstance
 from airflow.sdk.log import mask_secret
 from airflow.timetables.interval import CronDataIntervalTimetable
 
 from github_ingestion import db, pipeline, storage
-from github_ingestion.fixtures import FixtureSource
-from github_ingestion.github_client import GitHubClient
+from github_ingestion.fixtures import FixtureSource, missing_snapshots
+from github_ingestion.github_client import GitHubAPIError, GitHubClient, RateLimitExceeded
 
 log = logging.getLogger(__name__)
 
@@ -61,7 +68,7 @@ def _interval_start(ctx):
 
 
 def _snapshot_date(ctx) -> str:
-    return _interval_start(ctx).in_timezone("UTC").to_date_string()
+    return ctx["params"].get("snapshot_date") or _interval_start(ctx).in_timezone("UTC").to_date_string()
 
 
 def _run_path():
@@ -74,7 +81,7 @@ def _failed_tasks(ctx) -> list[str]:
     states = RuntimeTaskInstance.get_task_states(dag_id=dag_obj.dag_id, run_ids=[run_id]).get(run_id, {})
     failed = set()
     for key, state in states.items():
-        if state not in ("failed", "upstream_failed"):
+        if state != "failed":  # root causes only; downstream tasks are then "upstream_failed"
             continue
         task_id = key if key in dag_obj.task_ids else key.rsplit("_", 1)[0]  # mapped tasks: "<task_id>_<index>"
         if task_id != ctx["ti"].task_id:
@@ -82,10 +89,24 @@ def _failed_tasks(ctx) -> list[str]:
     return sorted(failed)
 
 
-def build_dag(dag_id: str, schema: str, source_mode: str, start_date, end_date=None, catchup: bool = False):
+def build_dag(dag_id: str, schema: str, source_mode: str, start_date, end_date=None, catchup: bool = False,
+              retry_delay: timedelta = timedelta(minutes=1), sensor_timeout: timedelta = timedelta(hours=1)):
     params = {
         "orgs": Param(DEFAULT_ORGS, type="array", description="GitHub organisations to ingest"),
         "full_refresh": Param(False, type="boolean", description="Fetch every repo (and soft-delete missing ones)"),
+        "simulate_failure": Param("none", enum=["none", "transient", "permanent"],
+                                  description="transient: first extract attempt fails then recovers on retry; "
+                                              "permanent: validation fails on every attempt"),
+    }
+    if source_mode == "fixture":
+        params["snapshot_date"] = Param(None, type=["null", "string"], format="date",
+                                        description="Replay this snapshot instead of the data interval's date")
+    default_args = {
+        "retries": 3,
+        "retry_delay": retry_delay,
+        "retry_exponential_backoff": True,  # 1x, 2x, 4x the delay (with jitter), capped below
+        "max_retry_delay": timedelta(minutes=15),
+        "execution_timeout": timedelta(minutes=20),
     }
 
     @dag(
@@ -95,6 +116,8 @@ def build_dag(dag_id: str, schema: str, source_mode: str, start_date, end_date=N
         end_date=end_date,
         catchup=catchup,
         max_active_runs=1,
+        dagrun_timeout=timedelta(hours=3),
+        default_args=default_args,
         params=params,
         tags=["github", "ingestion", source_mode],
         doc_md=__doc__,
@@ -120,25 +143,42 @@ def build_dag(dag_id: str, schema: str, source_mode: str, start_date, end_date=N
             log.info("Extraction plan (None = full refresh): %s", plan)
             return [{"org": org, "since": since} for org, since in plan.items()]
 
-        @task
-        def check_api_quota() -> dict:
+        @task.sensor(task_id="check_api_quota", poke_interval=300, timeout=sensor_timeout.total_seconds(),
+                     mode="reschedule", retries=1)
+        def check_api_quota() -> PokeReturnValue:
+            """Wait until GitHub has enough quota left for a full run (quota resets hourly)."""
             rl = _github_client().get_rate_limit()
             log.info("GitHub quota: %d/%d remaining, resets %s", rl.remaining, rl.limit, rl.reset_at)
-            if rl.remaining < MIN_API_QUOTA:
-                raise AirflowFailException(f"Only {rl.remaining} API calls left (need {MIN_API_QUOTA}); resets {rl.reset_at}")
-            return {"remaining": rl.remaining, "reset_at": rl.reset_at.isoformat()}
+            return PokeReturnValue(is_done=rl.remaining >= MIN_API_QUOTA,
+                                   xcom_value={"remaining": rl.remaining, "reset_at": rl.reset_at.isoformat()})
+
+        @task.sensor(task_id="wait_for_snapshot", poke_interval=30, timeout=sensor_timeout.total_seconds(),
+                     mode="reschedule", retries=0)
+        def wait_for_snapshot(orgs: list[str]) -> PokeReturnValue:
+            """Wait until the day's snapshot file exists for every org (like waiting for an upstream export)."""
+            snapshot = _snapshot_date(get_current_context())
+            missing = missing_snapshots(FIXTURES_DIR, snapshot, orgs)
+            log.info("Snapshot %s: missing orgs %s", snapshot, missing or "none")
+            return PokeReturnValue(is_done=not missing, xcom_value=snapshot)
 
         @task(map_index_template="{{ job.org }}")
         def extract_repositories(job: dict) -> dict:
             ctx = get_current_context()
-            if source_mode == "fixture":
-                source = FixtureSource(FIXTURES_DIR, _snapshot_date(ctx))
-            else:
-                source = _github_client()
-            return pipeline.extract_org(source, job["org"], _run_path(), since=job["since"])
+            if ctx["params"]["simulate_failure"] == "transient" and ctx["ti"].try_number == 1 \
+                    and job["org"] == ctx["params"]["orgs"][0]:
+                raise GitHubAPIError("Simulated failure: GitHub returned 503 Service Unavailable (attempt 1)")
+            source = FixtureSource(FIXTURES_DIR, _snapshot_date(ctx)) if source_mode == "fixture" else _github_client()
+            try:
+                return pipeline.extract_org(source, job["org"], _run_path(), since=job["since"])
+            except RateLimitExceeded as exc:
+                # Not retried inside the client; Airflow's retry (with backoff) tries again later.
+                raise AirflowException(f"{exc}. Will retry after the configured delay.") from exc
 
         @task(map_index_template="{{ manifest.org }}")
         def validate_repositories(manifest: dict) -> dict:
+            ctx = get_current_context()
+            if ctx["params"]["simulate_failure"] == "permanent" and manifest["org"] == ctx["params"]["orgs"][0]:
+                raise ValueError(f"Simulated failure: unreadable raw data for {manifest['org']} (fails every attempt)")
             return pipeline.validate_org(manifest, _run_path())
 
         @task
@@ -165,8 +205,8 @@ def build_dag(dag_id: str, schema: str, source_mode: str, start_date, end_date=N
         orgs = start_run()
         plan = plan_extraction(orgs)
         manifests = extract_repositories.expand(job=plan)
-        if source_mode == "live":
-            plan >> check_api_quota() >> manifests
+        ready = check_api_quota() if source_mode == "live" else wait_for_snapshot(orgs)
+        plan >> ready >> manifests
         summaries = validate_repositories.expand(manifest=manifests)
         load_and_quarantine(summaries) >> finalize_run()
 
@@ -180,5 +220,5 @@ github_ingestion = build_dag(
 github_ingestion_fixture = build_dag(
     "github_ingestion_fixture", schema="fixture", source_mode="fixture",
     start_date=pendulum.datetime(2026, 11, 18, tz="UTC"), end_date=pendulum.datetime(2026, 11, 24, tz="UTC"),
-    catchup=True,
+    catchup=True, retry_delay=timedelta(seconds=5), sensor_timeout=timedelta(minutes=2),
 )
