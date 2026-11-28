@@ -65,6 +65,17 @@ def start_run(conn, run_id: str, dag_id: str, source_mode: str, orgs: list[str],
     conn.commit()
 
 
+def ensure_run(conn, run_id: str, dag_id: str, source_mode: str, orgs: list[str]) -> None:
+    """Create the audit row if start_run never got to (e.g. start_run itself failed)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO pipeline_runs (run_id, dag_id, source_mode, orgs, status) "
+            "VALUES (%s, %s, %s, %s, 'running') ON CONFLICT (run_id) DO NOTHING",
+            (run_id, dag_id, source_mode, orgs),
+        )
+    conn.commit()
+
+
 AUDIT_COUNT_FIELDS = [
     "pages_fetched", "records_extracted", "records_valid", "records_invalid",
     "records_inserted", "records_updated", "records_unchanged", "records_quarantined",
