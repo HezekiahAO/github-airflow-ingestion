@@ -49,7 +49,7 @@ Run ids are named after the end of the interval (Airflow 3 naming), so logical d
 
     org    |        full_name         |                                           errors                                           | times_seen 
 -----------+--------------------------+--------------------------------------------------------------------------------------------+------------
- microsoft | microsoft/something-else | [{"field": "__root__", "message": "Value error, full_name 'microsoft/something-else' does  |          1
+ microsoft | microsoft/something-else | [{"field": "__root__", "message": "Value error, full_name 'microsoft/something-else'}] does  |          1
  shopify   | shopify/broken-fixture   | [{"field": "forks_count", "message": "Input should be greater than or equal to 0"}]        |          2
  stripe    | stripe/no-url            | [{"field": "html_url", "message": "Field required"}]                                       |          1
  stripe    | stripe/time-travel       | [{"field": "__root__", "message": "Value error, updated_at is earlier than created_at"}]   |          1
