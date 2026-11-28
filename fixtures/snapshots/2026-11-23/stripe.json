@@ -1,0 +1,290 @@
+[
+  {
+    "id": 85681300,
+    "node_id": "R_fixture_85681300",
+    "name": "stripe-python",
+    "full_name": "stripe/stripe-python",
+    "private": false,
+    "owner": {
+      "login": "stripe",
+      "id": 856813,
+      "type": "Organization"
+    },
+    "html_url": "https://github.com/stripe/stripe-python",
+    "description": "stripe-python (fixture snapshot)",
+    "fork": false,
+    "archived": false,
+    "disabled": false,
+    "visibility": "public",
+    "language": "Python",
+    "license": {
+      "key": "mit",
+      "spdx_id": "MIT"
+    },
+    "default_branch": "main",
+    "topics": [],
+    "stargazers_count": 1010,
+    "watchers_count": 1010,
+    "forks_count": 100,
+    "open_issues_count": 10,
+    "created_at": "2010-01-15T08:00:00Z",
+    "updated_at": "2026-11-18T12:00:00Z",
+    "pushed_at": "2026-11-18T11:00:00Z"
+  },
+  {
+    "id": 85681301,
+    "node_id": "R_fixture_85681301",
+    "name": "stripe-node",
+    "full_name": "stripe/stripe-node",
+    "private": false,
+    "owner": {
+      "login": "stripe",
+      "id": 856813,
+      "type": "Organization"
+    },
+    "html_url": "https://github.com/stripe/stripe-node",
+    "description": "stripe-node (fixture snapshot)",
+    "fork": false,
+    "archived": false,
+    "disabled": false,
+    "visibility": "public",
+    "language": "TypeScript",
+    "license": {
+      "key": "mit",
+      "spdx_id": "MIT"
+    },
+    "default_branch": "main",
+    "topics": [],
+    "stargazers_count": 2020,
+    "watchers_count": 2020,
+    "forks_count": 200,
+    "open_issues_count": 20,
+    "created_at": "2011-02-15T08:00:00Z",
+    "updated_at": "2026-11-19T12:00:00Z",
+    "pushed_at": "2026-11-19T11:00:00Z"
+  },
+  {
+    "id": 85681302,
+    "node_id": "R_fixture_85681302",
+    "name": "stripe-go",
+    "full_name": "stripe/stripe-go",
+    "private": false,
+    "owner": {
+      "login": "stripe",
+      "id": 856813,
+      "type": "Organization"
+    },
+    "html_url": "https://github.com/stripe/stripe-go",
+    "description": "stripe-go (fixture snapshot)",
+    "fork": false,
+    "archived": false,
+    "disabled": false,
+    "visibility": "public",
+    "language": "Go",
+    "license": {
+      "key": "mit",
+      "spdx_id": "MIT"
+    },
+    "default_branch": "main",
+    "topics": [],
+    "stargazers_count": 3030,
+    "watchers_count": 3030,
+    "forks_count": 300,
+    "open_issues_count": 30,
+    "created_at": "2012-03-15T08:00:00Z",
+    "updated_at": "2026-11-20T12:00:00Z",
+    "pushed_at": "2026-11-20T11:00:00Z"
+  },
+  {
+    "id": 85681303,
+    "node_id": "R_fixture_85681303",
+    "name": "stripe-java",
+    "full_name": "stripe/stripe-java",
+    "private": false,
+    "owner": {
+      "login": "stripe",
+      "id": 856813,
+      "type": "Organization"
+    },
+    "html_url": "https://github.com/stripe/stripe-java",
+    "description": "stripe-java (fixture snapshot)",
+    "fork": false,
+    "archived": false,
+    "disabled": false,
+    "visibility": "public",
+    "language": "Java",
+    "license": {
+      "key": "mit",
+      "spdx_id": "MIT"
+    },
+    "default_branch": "main",
+    "topics": [],
+    "stargazers_count": 4040,
+    "watchers_count": 4040,
+    "forks_count": 400,
+    "open_issues_count": 40,
+    "created_at": "2013-04-15T08:00:00Z",
+    "updated_at": "2026-11-21T12:00:00Z",
+    "pushed_at": "2026-11-21T11:00:00Z"
+  },
+  {
+    "id": 85681304,
+    "node_id": "R_fixture_85681304",
+    "name": "stripe-cli",
+    "full_name": "stripe/stripe-cli",
+    "private": false,
+    "owner": {
+      "login": "stripe",
+      "id": 856813,
+      "type": "Organization"
+    },
+    "html_url": "https://github.com/stripe/stripe-cli",
+    "description": "stripe-cli (fixture snapshot)",
+    "fork": false,
+    "archived": false,
+    "disabled": false,
+    "visibility": "public",
+    "language": "Go",
+    "license": {
+      "key": "apache-2.0",
+      "spdx_id": "Apache-2.0"
+    },
+    "default_branch": "main",
+    "topics": [],
+    "stargazers_count": 5050,
+    "watchers_count": 5050,
+    "forks_count": 500,
+    "open_issues_count": 50,
+    "created_at": "2014-05-15T08:00:00Z",
+    "updated_at": "2026-11-22T12:00:00Z",
+    "pushed_at": "2026-11-22T11:00:00Z"
+  },
+  {
+    "id": 85681305,
+    "node_id": "R_fixture_85681305",
+    "name": "stripe-mock",
+    "full_name": "stripe/stripe-mock",
+    "private": false,
+    "owner": {
+      "login": "stripe",
+      "id": 856813,
+      "type": "Organization"
+    },
+    "html_url": "https://github.com/stripe/stripe-mock",
+    "description": "stripe-mock (fixture snapshot)",
+    "fork": false,
+    "archived": false,
+    "disabled": false,
+    "visibility": "public",
+    "language": "Go",
+    "license": {
+      "key": "mit",
+      "spdx_id": "MIT"
+    },
+    "default_branch": "main",
+    "topics": [],
+    "stargazers_count": 6060,
+    "watchers_count": 6060,
+    "forks_count": 600,
+    "open_issues_count": 60,
+    "created_at": "2015-06-15T08:00:00Z",
+    "updated_at": "2026-11-23T12:00:00Z",
+    "pushed_at": "2026-11-23T11:00:00Z"
+  },
+  {
+    "id": 85681306,
+    "node_id": "R_fixture_85681306",
+    "name": "stripe-ios",
+    "full_name": "stripe/stripe-ios",
+    "private": false,
+    "owner": {
+      "login": "stripe",
+      "id": 856813,
+      "type": "Organization"
+    },
+    "html_url": "https://github.com/stripe/stripe-ios",
+    "description": "stripe-ios (fixture snapshot)",
+    "fork": false,
+    "archived": false,
+    "disabled": false,
+    "visibility": "public",
+    "language": "Swift",
+    "license": {
+      "key": "mit",
+      "spdx_id": "MIT"
+    },
+    "default_branch": "main",
+    "topics": [],
+    "stargazers_count": 7000,
+    "watchers_count": 7000,
+    "forks_count": 700,
+    "open_issues_count": 70,
+    "created_at": "2016-07-15T08:00:00Z",
+    "updated_at": "2026-11-10T12:00:00Z",
+    "pushed_at": "2026-11-10T11:00:00Z"
+  },
+  {
+    "id": 85681307,
+    "node_id": "R_fixture_85681307",
+    "name": "stripe-mcp",
+    "full_name": "stripe/stripe-mcp",
+    "private": false,
+    "owner": {
+      "login": "stripe",
+      "id": 856813,
+      "type": "Organization"
+    },
+    "html_url": "https://github.com/stripe/stripe-mcp",
+    "description": "stripe-mcp (fixture snapshot)",
+    "fork": false,
+    "archived": false,
+    "disabled": false,
+    "visibility": "public",
+    "language": "TypeScript",
+    "license": {
+      "key": "mit",
+      "spdx_id": "MIT"
+    },
+    "default_branch": "main",
+    "topics": [],
+    "stargazers_count": 8000,
+    "watchers_count": 8000,
+    "forks_count": 800,
+    "open_issues_count": 80,
+    "created_at": "2026-11-20T09:00:00Z",
+    "updated_at": "2026-11-20T12:00:00Z",
+    "pushed_at": "2026-11-20T11:00:00Z"
+  },
+  {
+    "id": 85681309,
+    "node_id": "R_fixture_85681309",
+    "name": "time-travel",
+    "full_name": "stripe/time-travel",
+    "private": false,
+    "owner": {
+      "login": "stripe",
+      "id": 856813,
+      "type": "Organization"
+    },
+    "html_url": "https://github.com/stripe/time-travel",
+    "description": "time-travel (fixture snapshot)",
+    "fork": false,
+    "archived": false,
+    "disabled": false,
+    "visibility": "public",
+    "language": "Ruby",
+    "license": {
+      "key": "mit",
+      "spdx_id": "MIT"
+    },
+    "default_branch": "main",
+    "topics": [],
+    "stargazers_count": 10000,
+    "watchers_count": 10000,
+    "forks_count": 1000,
+    "open_issues_count": 100,
+    "created_at": "2027-01-01T00:00:00Z",
+    "updated_at": "2026-11-23T12:00:00Z",
+    "pushed_at": "2026-11-10T11:00:00Z"
+  }
+]
