@@ -103,6 +103,26 @@ def finish_run(conn, run_id: str, status: str, counts: dict | None = None,
     conn.commit()
 
 
+def save_quality_metrics(conn, run_id: str, metrics: list[dict]) -> None:
+    """Upsert one row per metric, so a retried quality task overwrites instead of failing."""
+    with conn.cursor() as cur:
+        for m in metrics:
+            cur.execute(
+                """
+                INSERT INTO data_quality_metrics
+                    (run_id, metric, value, numerator, denominator, threshold, severity, passed, definition)
+                VALUES (%(run_id)s, %(metric)s, %(value)s, %(numerator)s, %(denominator)s, %(threshold)s,
+                        %(severity)s, %(passed)s, %(definition)s)
+                ON CONFLICT (run_id, metric) DO UPDATE SET
+                    value = EXCLUDED.value, numerator = EXCLUDED.numerator, denominator = EXCLUDED.denominator,
+                    threshold = EXCLUDED.threshold, severity = EXCLUDED.severity, passed = EXCLUDED.passed,
+                    definition = EXCLUDED.definition, measured_at = now()
+                """,
+                {**m, "run_id": run_id},
+            )
+    conn.commit()
+
+
 # ---------------------------------------------------------------- checkpoints
 
 def get_checkpoints(conn, orgs: list[str]) -> dict[str, datetime]:

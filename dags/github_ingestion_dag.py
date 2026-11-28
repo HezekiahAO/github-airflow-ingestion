@@ -5,7 +5,7 @@ Two DAGs share the same tasks and code path:
   github_ingestion_fixture  replayed daily snapshots, schema `fixture` (reproducible backfills)
 
 start_run -> plan_extraction -> check_api_quota | wait_for_snapshot (sensor) -> extract_repositories[org]
-          -> validate_repositories[org] -> load_and_quarantine -> finalize_run
+          -> validate_repositories[org] -> load_and_quarantine -> quality_report -> finalize_run
 
 Big data (API responses, validated records) is written to files on the shared
 ./data volume; XCom only carries file paths, timestamps and counts.
@@ -34,7 +34,7 @@ from airflow.sdk.execution_time.task_runner import RuntimeTaskInstance
 from airflow.sdk.log import mask_secret
 from airflow.timetables.interval import CronDataIntervalTimetable
 
-from github_ingestion import db, pipeline, storage
+from github_ingestion import db, pipeline, quality, storage
 from github_ingestion.fixtures import FixtureSource, missing_snapshots
 from github_ingestion.github_client import GitHubAPIError, GitHubClient, RateLimitExceeded
 
@@ -186,6 +186,22 @@ def build_dag(dag_id: str, schema: str, source_mode: str, start_date, end_date=N
             with _connect(schema) as conn:
                 return pipeline.load_results(conn, get_current_context()["run_id"], list(summaries))
 
+        @task
+        def quality_report(summaries: list[dict]) -> dict:
+            """Measure the run's data; fail the run if an error-severity metric misses its threshold."""
+            run_id = get_current_context()["run_id"]
+            with _connect(schema) as conn:
+                report = quality.run_quality_checks(conn, run_id, list(summaries),
+                                                    _run_path() / "reports" / "quality_report.json")
+            for name, m in report["metrics"].items():
+                log.info("quality %-12s %.5f (threshold %.2f, %s) %s", name, m["value"], m["threshold"],
+                         m["severity"], "PASS" if m["passed"] else "FAIL")
+            if report["failed_warnings"]:
+                log.warning("Quality warnings: %s", report["failed_warnings"])
+            if not report["passed"]:
+                raise AirflowFailException(f"Quality check failed: {report['failed_errors']}")
+            return {"passed": True, "failed_warnings": report["failed_warnings"]}
+
         @task(trigger_rule="all_done")
         def finalize_run() -> dict:
             """Always runs; records the true outcome and fails the DAG run if anything upstream failed."""
@@ -193,9 +209,11 @@ def build_dag(dag_id: str, schema: str, source_mode: str, start_date, end_date=N
             failed = _failed_tasks(ctx)
             counts = ctx["ti"].xcom_pull(task_ids="load_and_quarantine") or {}
             status = "failed" if failed else "success"
+            report_path = _run_path() / "reports" / "quality_report.json"
+            report = storage.read_json(report_path) if report_path.exists() else None
             with _connect(schema) as conn:
                 db.ensure_run(conn, ctx["run_id"], dag_id, source_mode, list(ctx["params"]["orgs"]))
-                db.finish_run(conn, ctx["run_id"], status, counts, failed_tasks=failed,
+                db.finish_run(conn, ctx["run_id"], status, counts, quality_report=report, failed_tasks=failed,
                               error_message=f"Failed tasks: {', '.join(failed)}. See task logs." if failed else None)
             log.info("Run %s finished with status=%s counts=%s", ctx["run_id"], status, counts)
             if failed:
@@ -208,7 +226,7 @@ def build_dag(dag_id: str, schema: str, source_mode: str, start_date, end_date=N
         ready = check_api_quota() if source_mode == "live" else wait_for_snapshot(orgs)
         plan >> ready >> manifests
         summaries = validate_repositories.expand(manifest=manifests)
-        load_and_quarantine(summaries) >> finalize_run()
+        load_and_quarantine(summaries) >> quality_report(summaries) >> finalize_run()
 
     return github_ingestion()
 

@@ -14,7 +14,9 @@ COMMON_EDGES = [
     ("plan_extraction", "extract_repositories"),
     ("extract_repositories", "validate_repositories"),
     ("validate_repositories", "load_and_quarantine"),
-    ("load_and_quarantine", "finalize_run"),
+    ("load_and_quarantine", "quality_report"),
+    ("validate_repositories", "quality_report"),
+    ("quality_report", "finalize_run"),
 ]
 
 
