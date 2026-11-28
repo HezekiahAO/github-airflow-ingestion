@@ -1,6 +1,6 @@
 """Small GitHub REST API client with pagination, bounded retries and rate-limit handling.
 
-Retry policy i am working with:
+Retry policy:
 - Network timeouts / connection errors and 5xx responses are transient: retry a
   fixed number of times with exponential backoff, then give up.
 - Rate-limit responses (403/429 with no remaining quota, or Retry-After) are NOT
@@ -96,15 +96,19 @@ class GitHubClient:
             reset_at=datetime.fromtimestamp(core["reset"], tz=timezone.utc),
         )
 
-    def iter_org_repo_pages(self, org: str, per_page: int = 100) -> Iterator[Page]:         # requests 100 repos per page and follows GitHub's Link: rel="next" header until there are no pages left.
+    def iter_org_repo_pages(self, org: str, per_page: int = 100, sort: str = "full_name") -> Iterator[Page]:
         """Yield every page of public repositories for an organisation.
+
+        sort="updated" returns the most recently updated repos first (GitHub's
+        default direction for that sort is descending), which lets incremental
+        runs stop early once they reach repos older than the checkpoint.
 
         GitHub paginates with a `Link: <...>; rel="next"` header. We follow it
         until it disappears rather than guessing page numbers, and stop with an
         error after `max_pages` so a misbehaving API can't loop us forever.
         """
         url: str | None = f"{self.base_url}/orgs/{org}/repos"
-        params: dict | None = {"type": "public", "per_page": per_page, "sort": "full_name"}
+        params: dict | None = {"type": "public", "per_page": per_page, "sort": sort}
         page_number = 0
         while url:
             page_number += 1
@@ -140,7 +144,7 @@ class GitHubClient:
             return resp
         raise AssertionError("unreachable")
 
-    def _backoff(self, url: str, attempt: int, reason: str) -> None:         #Retry timeouts and 5xx errors a fixed number of times, waiting longer each time (exponential backoff), so it can't loop forever.
+    def _backoff(self, url: str, attempt: int, reason: str) -> None:
         delay = self.backoff_base * 2 ** (attempt - 1)
         logger.warning("GET %s failed (%s), attempt %d/%d; retrying in %.1fs",
                        url, reason, attempt, self.max_attempts, delay)
@@ -151,7 +155,7 @@ def _rate_limit_reset(resp: requests.Response) -> datetime | None:
     """Return the reset time if this response is a rate-limit rejection, else None."""
     if resp.status_code not in (403, 429):
         return None
-    retry_after = resp.headers.get("Retry-After")       # Basically, when the rate limit is exhausted, stop and raise an error that includes the reset time, instead of retrying.
+    retry_after = resp.headers.get("Retry-After")
     if retry_after is not None:
         return datetime.now(timezone.utc) + timedelta(seconds=int(retry_after))
     if resp.headers.get("X-RateLimit-Remaining") == "0":
