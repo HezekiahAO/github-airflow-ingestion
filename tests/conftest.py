@@ -26,3 +26,34 @@ def raw_repo() -> dict:
         "pushed_at": "2026-11-20T09:00:00Z",
         "node_id": "ignored-extra-field",
     }
+
+
+import os
+import uuid
+
+DB_URL = os.environ.get("TEST_DATABASE_URL")
+
+
+@pytest.fixture
+def pg_conn():
+    """A connection to a fresh, throwaway schema with all tables migrated.
+
+    Set TEST_DATABASE_URL (e.g. postgresql://postgres:test@localhost:5433/postgres)
+    to run these tests; they are skipped otherwise.
+    """
+    if not DB_URL:
+        pytest.skip("TEST_DATABASE_URL not set")
+    psycopg2 = pytest.importorskip("psycopg2")
+    from github_ingestion import db
+
+    schema = f"test_{uuid.uuid4().hex[:10]}"
+    conn = psycopg2.connect(DB_URL)
+    db.migrate(conn, schema)
+    try:
+        yield conn
+    finally:
+        conn.rollback()
+        with conn.cursor() as cur:
+            cur.execute(f'DROP SCHEMA "{schema}" CASCADE')
+        conn.commit()
+        conn.close()
